@@ -665,6 +665,95 @@ setMethod("Vision", signature(data = "Seurat"),
           }
 )
 
+#' Create Vision object form a Seurat 5.X object
+#'
+#' Initializes a Vision object from an existing Seurat object taking any existing
+#' expression data, meta-data, and dimensionality reductions if they exist already
+#'
+#' @rdname VISION-class
+#' @param assay The assay slot in the Seurat object to use for expression data
+#' @param dimRed Dimensionality reduction to use for the latentSpace.  Default is to
+#' look for "pca" and use that if it exists
+#' @param dimRedComponents number of components to use for the selected dimensionality
+#' reduction.  Default is to use all components
+#' @export
+setMethod("Vision", signature(data = "Seurat"),
+          function(data, assay = "RNA", dimRed = NULL, dimRedComponents = NULL, ...) {
+
+              if (!requireNamespace("Seurat", quietly = TRUE)){
+                  stop("Package \"Seurat\" needed to load this data object.  Please install it.",
+                       call. = FALSE)
+              }
+
+              obj <- data
+              args <- list(...)
+
+              # Get Expression Data from seurat object
+              # here we can't use @scale.data because it has been
+              # centered already
+              message(
+                  sprintf("Importing counts from obj[[\"%s\"]]@counts ...", assay)
+              )
+              message("Normalizing to counts per 10,000...")
+              exprData <- obj@assays$RNA@layers$counts
+              totals <- colSums(exprData)
+              scalefactor <- 10000
+              exprData <- t(t(exprData) / totals * scalefactor)
+
+
+              args[["data"]] <- exprData
+
+              # Get meta data
+              if (!("meta" %in% names(args))){
+                  message("Importing Meta Data from obj@meta.data ...")
+                  args[["meta"]] <- obj@meta.data
+              }
+
+              # Get latent space
+              if (is.null(dimRed) && "pca" %in% Reductions(obj)) {
+                  dimRed <- "pca"
+              }
+
+              if (!("latentSpace" %in% names(args))){
+
+                  latentSpace <- Embeddings(obj,
+                      reduction = dimRed
+                  )
+
+                  if (is.null(dimRedComponents)) {
+                      dimRedComponents <- ncol(latentSpace)
+                  }
+
+                  latentSpace <- latentSpace[, 1:dimRedComponents]
+
+                  message(
+                      sprintf("Importing latent space from Embeddings(obj, \"%s\") using first %i components",
+                          dimRed, dimRedComponents
+                  ))
+
+                  args[["latentSpace"]] <- latentSpace
+
+              }
+
+              vis <- do.call(Vision, args)
+
+              for (method in names(obj@reductions)){
+                  name <- paste0("Seurat_", method)
+
+                  message(sprintf("Adding Visualization: %s", name))
+
+                  coordinates <- Embeddings(obj,
+                      reduction = method)
+
+                  vis <- addProjection(vis,
+                      name, coordinates
+                      )
+              }
+
+              return(vis)
+          }
+)
+
 
 #' Main entry point for running VISION Analysis
 #'
