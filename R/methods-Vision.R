@@ -510,7 +510,7 @@ setMethod("Vision", signature(data = "Seurat"),
               message(
                   sprintf("Importing counts from obj[[\"%s\"]]@counts ...", assay)
               )
-              message("Normalizing to counts per 10,000...")
+              message("SP TEST Normalizing to counts per 10,000...")
               exprData <- obj@assays$RNA@layers$counts
               totals <- colSums(exprData)
               scalefactor <- 10000
